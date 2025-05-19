@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 
 # Define the path to your JSONL file
-JSONL_FILE_PATH = "/home/luc/Programming/forks/fatigue-graph/output.jsonl"
+JSONL_FILE_PATH = "/home/luc/Programming/forks/fatigue-graph/duration_per_day/accuracies.jsonl"
 
 # Define the methods we expect to see results for
 METHODS = [
@@ -29,7 +29,6 @@ with open(JSONL_FILE_PATH, 'r') as f:
         user_id = user_data.get("user_id")
         method_results = user_data.get("results", {})
 
-        print(user_data)
         # Skip users with no method results or empty results
         if not method_results:
             continue
@@ -76,7 +75,7 @@ ax.set_yticklabels(METHODS)
 for i in range(len(METHODS)):
     for j in range(len(METHODS)):
         if i == j: continue # Skip diagonal
-        val = superiority_matrix_df.iloc[i, j] / 10_000
+        val = superiority_matrix_df.iloc[i, j] / users_with_valid_data
         text_color = "white" if val > 0.5 else "black" # Adjust text color based on cell brightness
         ax.text(j, i, f"{val:.1%}",
                        ha="center", va="center", color=text_color, fontsize=9)
