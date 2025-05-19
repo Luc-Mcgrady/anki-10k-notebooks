@@ -4,6 +4,7 @@ import os
 import sys
 import json
 from tqdm.auto import tqdm
+from scipy.stats import siegelslopes
 
 sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 import numpy as np
@@ -76,22 +77,32 @@ def process_user(user_id):
             "loss": loss(test_sums["review_average"] * multiplier),
         }
 
-    def review_trend():
-        difference = train_sums["duration"] / train_sums["review_average"]
-        c = np.polyfit(train_sums["review_average"], difference, 1)
-        adjustment = np.polyval(c, test_sums["review_average"])
-        return {"c": c.tolist(), "loss": loss(test_sums["review_average"] * adjustment)}
+    default_fit = lambda x, y: np.polyfit(x, y, 1)
 
-    def true_retention_trend():
+    def review_trend(fit=default_fit):
+        difference = train_sums["duration"] / train_sums["review_average"]
+        c = fit(train_sums["review_average"], difference)
+        adjustment = np.polyval(c, test_sums["review_average"])
+        return {"c": list(c), "loss": loss(test_sums["review_average"] * adjustment)}
+
+    def true_retention_trend(fit=default_fit):
         retention = train_sums["y"] / train_counts["y"]
-        c = np.polyfit(
-            retention, train_sums["duration"] / train_sums["review_average"], 1
+        c = fit(
+            retention, train_sums["duration"] / train_sums["review_average"]
         )
         retention = test_sums["y"] / test_counts["y"]
         return {
-            "c": c.tolist(),
+            "c": list(c),
             "loss": loss(test_sums["review_average"] * np.polyval(c, retention)),
         }
+
+    siegel = lambda x, y: siegelslopes(y, x)
+    
+    def review_trend_siegel():
+        return review_trend(siegel)
+    
+    def true_retention_trend_siegel():
+        return true_retention_trend(siegel)
 
     results = {
         function.__name__: function()
@@ -101,6 +112,8 @@ def process_user(user_id):
             median_multiplier,
             review_trend,
             true_retention_trend,
+            review_trend_siegel,
+            true_retention_trend_siegel
         ]
     }
 

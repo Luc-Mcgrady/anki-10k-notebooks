@@ -11,7 +11,9 @@ METHODS = [
   "mean_multiplier",
   "median_multiplier",
   "review_trend",
-  "true_retention_trend"
+  "true_retention_trend",
+  "review_trend_siegel",
+  "true_retention_trend_siegel",
 ]
 
 # Initialize a dictionary to store win counts
@@ -83,7 +85,7 @@ for i in range(len(METHODS)):
 # Add a colorbar
 plt.colorbar(heatmap)
 
-plt.title("Superiority Matrix Heatmap")
+plt.title("Duration Prediction Superiority Matrix")
 plt.tight_layout()
 plt.savefig("/home/luc/Programming/forks/fatigue-graph/duration_per_day/superiority_matrix.png")
 print("\nSuperiority matrix heatmap saved to /home/luc/Programming/forks/fatigue-graph/duration_per_day/superiority_matrix.png")
