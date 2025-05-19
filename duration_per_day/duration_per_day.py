@@ -1,6 +1,7 @@
 import pandas as pd
 import os
 import sys
+import json
 from tqdm.auto import tqdm
 
 sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
@@ -62,7 +63,7 @@ def process_user(user_id):
     test_counts, test_sums = counts_sums(test_groups)
 
     def loss(p: pd.Series):
-        return abs(test_sums["duration"] - p).mean() / (60 * 60 * 24)
+        return float(abs(test_sums["duration"] - p).mean() / (60 * 60 * 24))
 
     def rating_medians():
         return {"loss": loss(test_sums["review_average"])}
@@ -85,7 +86,7 @@ def process_user(user_id):
         difference = train_sums["duration"] / train_sums["review_average"]
         c = np.polyfit(train_counts["review_average"], difference, 1)
         adjustment = np.polyval(c, test_counts["review_average"])
-        return {"c": c, "loss": loss(test_counts["review_average"] * adjustment)}
+        return {"c": c.tolist(), "loss": loss(test_counts["review_average"] * adjustment)}
 
     def true_retention_trend():
         retention = train_sums["y"] / train_counts["y"]
@@ -94,11 +95,11 @@ def process_user(user_id):
         )
         retention = test_sums["y"] / test_counts["y"]
         return {
-            "c": c,
+            "c": c.tolist(),
             "loss": loss(test_counts["review_average"] * np.polyval(c, retention)),
         }
 
-    return {
+    results = {
         function.__name__: function()
         for function in [
             rating_medians,
@@ -109,4 +110,9 @@ def process_user(user_id):
         ]
     }
 
-print(process_user(1))
+    return {"user_id": user_id, **results}
+
+with open("output.jsonl", "w") as f:
+    for user_id in tqdm(range(1, 10000)):
+        f.write(json.dumps(process_user(user_id)) + "\n")
+        f.flush()
