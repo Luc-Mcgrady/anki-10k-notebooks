@@ -106,9 +106,25 @@ def process_user(user_id):
 
     return {"user_id": user_id, "results": results}
 
-with open("output.jsonl", "w") as f:
+OUTPUT_FILE = "duration_per_day/accuracies.jsonl"
+
+processed_ids = set()
+if os.path.exists(OUTPUT_FILE):
+    with open(OUTPUT_FILE, "r") as f:
+        for line in f:
+            try:
+                data = json.loads(line)
+                processed_ids.add(data["user_id"])
+            except json.JSONDecodeError:
+                continue  # skip malformed lines
+
+# Step 2: Determine which user_ids still need processing
+all_ids = set(range(1, 10001))
+remaining_ids = sorted(all_ids - processed_ids)
+
+with open(OUTPUT_FILE, "a") as f:
     with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = {executor.submit(process_user, user_id): user_id for user_id in range(1, 10001)}
+        futures = {executor.submit(process_user, user_id): user_id for user_id in remaining_ids}
         for future in tqdm(as_completed(futures), total=len(futures)):
             result = future.result()
             f.write(json.dumps(result) + "\n")
