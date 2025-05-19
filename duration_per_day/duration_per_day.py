@@ -1,3 +1,4 @@
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import pandas as pd
 import os
 import sys
@@ -21,21 +22,14 @@ def process_user(user_id):
     )
     df["y"] = df["rating"].map({1: 0, 2: 1, 3: 1, 4: 1})
     df.size
-    df_filtered = df[(df["elapsed_days"] > 0)]
+    df_filtered = df[(df["elapsed_days"] > 0)].copy()
 
     groups = df_filtered.groupby("rating")["duration"].median()
 
     df_filtered["review_average"] = df_filtered["rating"].map(groups)
 
-    current_residual = df_filtered.groupby("rating").apply(
-        lambda x: abs(x["duration"] - x["review_average"]).mean()
-    )
-
-    current_residual, groups
-
     columns = ["duration", "review_average", "y"]
 
-    day_accuracies = df_filtered.groupby("day_offset")[columns]
     unique_days = df_filtered["day_offset"].unique()
 
     train_days, test_days = train_test_split(unique_days)
@@ -110,9 +104,12 @@ def process_user(user_id):
         ]
     }
 
-    return {"user_id": user_id, **results}
+    return {"user_id": user_id, "results": results}
 
 with open("output.jsonl", "w") as f:
-    for user_id in tqdm(range(1, 10000)):
-        f.write(json.dumps(process_user(user_id)) + "\n")
-        f.flush()
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        futures = {executor.submit(process_user, user_id): user_id for user_id in range(1, 10001)}
+        for future in tqdm(as_completed(futures), total=len(futures)):
+            result = future.result()
+            f.write(json.dumps(result) + "\n")
+            f.flush()
