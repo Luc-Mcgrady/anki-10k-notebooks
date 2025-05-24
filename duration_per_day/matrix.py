@@ -8,6 +8,7 @@ JSONL_FILE_PATH = "/home/luc/Programming/forks/fatigue-graph/duration_per_day/ac
 # Define the methods we expect to see results for
 METHODS = [
   "rating_medians",
+  "rating_means",
   "mean_multiplier",
   "median_multiplier",
   "review_trend",

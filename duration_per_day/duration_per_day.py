@@ -25,11 +25,13 @@ def process_user(user_id):
     df.size
     df_filtered = df[(df["elapsed_days"] > 0)].copy()
 
-    groups = df_filtered.groupby("rating")["duration"].median()
+    median_groups = df_filtered.groupby("rating")["duration"].median()
+    mean_groups = df_filtered.groupby("rating")["duration"].mean()
 
-    df_filtered["review_average"] = df_filtered["rating"].map(groups)
+    df_filtered["review_median"] = df_filtered["rating"].map(median_groups)
+    df_filtered["review_mean"] = df_filtered["rating"].map(mean_groups)
 
-    columns = ["duration", "review_average", "y"]
+    columns = ["duration", "review_median", "review_mean", "y"]
 
     unique_days = df_filtered["day_offset"].unique()
 
@@ -46,7 +48,7 @@ def process_user(user_id):
         counts = groups.count()
         sums = groups.sum()
 
-        # Sort by count of 'duration' (or 'review_average' – whichever makes sense)
+        # Sort by count of 'duration' (or 'review_median' – whichever makes sense)
         sorted_indices = counts["duration"].sort_values().index
 
         # Reorder both sums and counts to match
@@ -61,39 +63,42 @@ def process_user(user_id):
         return float(abs(test_sums["duration"] - p).mean() / (1000 * 60)) # Minutes
 
     def rating_medians():
-        return {"loss": loss(test_sums["review_average"])}
+        return {"loss": loss(test_sums["review_median"])}
+
+    def rating_means():
+        return {"loss": loss(test_sums["review_mean"])}
 
     def mean_multiplier():
-        multiplier = (train_sums["duration"] / train_sums["review_average"]).mean()
+        multiplier = (train_sums["duration"] / train_sums["review_median"]).mean()
         return {
             "multiplier": multiplier,
-            "loss": loss(test_sums["review_average"] * multiplier),
+            "loss": loss(test_sums["review_median"] * multiplier),
         }
 
     def median_multiplier():
-        multiplier = (train_sums["duration"] / train_sums["review_average"]).median()
+        multiplier = (train_sums["duration"] / train_sums["review_median"]).median()
         return {
             "multiplier": multiplier,
-            "loss": loss(test_sums["review_average"] * multiplier),
+            "loss": loss(test_sums["review_median"] * multiplier),
         }
 
     default_fit = lambda x, y: np.polyfit(x, y, 1)
 
     def review_trend(fit=default_fit):
-        difference = train_sums["duration"] / train_sums["review_average"]
-        c = fit(train_sums["review_average"], difference)
-        adjustment = np.polyval(c, test_sums["review_average"])
-        return {"c": list(c), "loss": loss(test_sums["review_average"] * adjustment)}
+        difference = train_sums["duration"] / train_sums["review_median"]
+        c = fit(train_sums["review_median"], difference)
+        adjustment = np.polyval(c, test_sums["review_median"])
+        return {"c": list(c), "loss": loss(test_sums["review_median"] * adjustment)}
 
     def true_retention_trend(fit=default_fit):
         retention = train_sums["y"] / train_counts["y"]
         c = fit(
-            retention, train_sums["duration"] / train_sums["review_average"]
+            retention, train_sums["duration"] / train_sums["review_median"]
         )
         retention = test_sums["y"] / test_counts["y"]
         return {
             "c": list(c),
-            "loss": loss(test_sums["review_average"] * np.polyval(c, retention)),
+            "loss": loss(test_sums["review_median"] * np.polyval(c, retention)),
         }
 
     siegel = lambda x, y: siegelslopes(y, x)
@@ -108,6 +113,7 @@ def process_user(user_id):
         function.__name__: function()
         for function in [
             rating_medians,
+            rating_means,
             mean_multiplier,
             median_multiplier,
             review_trend,
