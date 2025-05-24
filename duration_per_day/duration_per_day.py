@@ -25,17 +25,20 @@ def process_user(user_id):
     df.size
     df_filtered = df[(df["elapsed_days"] > 0)].copy()
 
-    median_groups = df_filtered.groupby("rating")["duration"].median()
-    mean_groups = df_filtered.groupby("rating")["duration"].mean()
-
-    df_filtered["review_median"] = df_filtered["rating"].map(median_groups)
-    df_filtered["review_mean"] = df_filtered["rating"].map(mean_groups)
-
     columns = ["duration", "review_median", "review_mean", "y"]
 
     unique_days = df_filtered["day_offset"].unique()
 
     train_days, test_days = train_test_split(unique_days)
+
+    train_df = df_filtered[df_filtered["day_offset"].isin(train_days)]
+    test_df = df_filtered[df_filtered["day_offset"].isin(test_days)]
+
+    median_groups = train_df.groupby("rating")["duration"].median()
+    mean_groups = train_df.groupby("rating")["duration"].mean()
+
+    df_filtered["review_median"] = df_filtered["rating"].map(median_groups)
+    df_filtered["review_mean"] = df_filtered["rating"].map(mean_groups)
 
     train_df = df_filtered[df_filtered["day_offset"].isin(train_days)]
     test_df = df_filtered[df_filtered["day_offset"].isin(test_days)]
