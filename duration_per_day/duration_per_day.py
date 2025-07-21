@@ -149,13 +149,13 @@ def process_user(user_id):
         return float(abs(test_sums["duration"] - p).mean() / (1000 * 60)) # Minutes
 
     def rating_medians():
-        return {"loss": loss(test_sums["review_median"])}
+        return {"averages": median_groups.to_list(), "loss": loss(test_sums["review_median"])}
 
     def rating_means():
-        return {"loss": loss(test_sums["review_mean"])}
+        return {"averages": mean_groups.to_list(), "loss": loss(test_sums["review_mean"])}
     
     def rating_huber():
-        return {"loss": loss(test_sums["review_huber"])}
+        return {"averages": huber_groups.to_list(), "loss": loss(test_sums["review_huber"])}
 
     def mean_multiplier():
         multiplier = (train_sums["duration"] / train_sums["review_median"]).mean()
@@ -203,12 +203,12 @@ def process_user(user_id):
         for function in [
             rating_medians,
             rating_means,
-            mean_multiplier,
-            median_multiplier,
-            review_trend,
-            true_retention_trend,
-            review_trend_siegel,
-            true_retention_trend_siegel,
+            # mean_multiplier,
+            # median_multiplier,
+            # review_trend,
+            # true_retention_trend,
+            # review_trend_siegel,
+            # true_retention_trend_siegel,
             rating_huber
         ]
     }
