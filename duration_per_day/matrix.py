@@ -9,12 +9,7 @@ JSONL_FILE_PATH = "/home/luc/Programming/forks/fatigue-graph/duration_per_day/ac
 METHODS = [
   "rating_medians",
   "rating_means",
-  "mean_multiplier",
-  "median_multiplier",
-  "review_trend",
-  "true_retention_trend",
-  "review_trend_siegel",
-  "true_retention_trend_siegel",
+  "rating_huber"
 ]
 
 # Initialize a dictionary to store win counts
@@ -37,7 +32,7 @@ with open(JSONL_FILE_PATH, 'r') as f:
             continue
 
         # Extract MAE values for the methods we care about, handling potential None/NaN
-        current_maes = {k: v["loss"] for k, v in method_results.items()}
+        current_maes = {k: v["loss"] for k, v in method_results.items() if k in METHODS and v is not None and not np.isnan(v["loss"])}
         users_with_valid_data += 1
 
         # Compare all pairs of methods for this user

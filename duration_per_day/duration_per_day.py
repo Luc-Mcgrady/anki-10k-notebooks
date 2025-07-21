@@ -9,11 +9,92 @@ from scipy.stats import siegelslopes
 sys.path.insert(0, os.path.abspath("../fsrs-optimizer/src/fsrs_optimizer/"))
 import numpy as np
 from sklearn.model_selection import train_test_split
+import math
 
 # Review count: User id
 # Median: 8798
 # Most: 6810
 
+def q_fast(array):
+    n = len(array)
+    if n < 2:
+        raise Exception('n<2')
+
+    # Same correction factors as original
+    small_sample_correction_factors = {2: 0.399, 3: 0.994, 4: 0.512, 5: 0.844, 6: 0.611, 7: 0.857, 8: 0.669, 9: 0.872}
+    if n <= 9:
+        correction_factor = small_sample_correction_factors.get(n)
+    else:
+        if n % 2 == 0:
+            correction_factor = n / (n + 3.8)
+        else:
+            correction_factor = n / (n + 1.4)
+
+    const = correction_factor * 2.21914
+    quartile = math.comb(math.floor(n / 2) + 1, 2) - 1
+
+    # Sort the array first - O(n log n)
+    sorted_array = sorted(array)
+
+    # Binary search on the answer
+    left, right = 0, sorted_array[-1] - sorted_array[0]
+
+    def count_pairs_leq(target):
+        """Count how many |x_i - x_j| <= target for i < j"""
+        count = 0
+        j = 1
+        for i in range(n):
+            # For sorted array, |x_i - x_j| = x_j - x_i for j > i
+            # Find largest j such that x_j - x_i <= target
+            while j < n and sorted_array[j] - sorted_array[i] <= target:
+                j += 1
+            # All pairs (i, k) where i < k < j satisfy the condition
+            count += max(0, j - i - 1)
+        return count
+
+    # Binary search to find the exact value
+    while right - left > 1e-10:
+        mid = (left + right) / 2
+        if count_pairs_leq(mid) <= quartile:
+            left = mid
+        else:
+            right = mid
+
+    return const * left
+
+
+def huber(a):
+    array = np.asarray(a)
+    scale = q_fast(array) # estimator of scale has to be robust
+
+    if scale == 0:
+        if np.max(array) == np.min(array):  # all values are the same
+            return np.mean(array)
+        else:
+            raise Exception('Scale=0')
+
+    prev_val = np.median(array)  # initial guess, estimator of location also has to be robust
+    maxiter = 1000
+    tol = 1e-5
+    c = 1.339  # roughly 95% asymptotic relative efficiency for a normal distribution
+
+    def weighted_mean(array, prev_val):
+        epsilon = 1e-15 # this is just to avoid division by 0 error
+        weights = np.where(np.abs(array - prev_val) / scale <= c, 1,
+                           np.abs(c / ((array - prev_val + epsilon) / scale)))  # this is faster than a for loop
+
+        weighted_mean = np.average(array, weights=weights)
+        return weighted_mean
+
+    next_val = weighted_mean(array, prev_val)
+
+    iter_count = 0
+    while np.abs(prev_val - next_val) > tol and iter_count <= maxiter:
+        prev_val = next_val
+        next_val = weighted_mean(array, prev_val)
+        iter_count += 1
+
+    return next_val
 
 def process_user(user_id):
     df = pd.read_parquet(
@@ -25,7 +106,7 @@ def process_user(user_id):
     df.size
     df_filtered = df[(df["elapsed_days"] > 0)].copy()
 
-    columns = ["duration", "review_median", "review_mean", "y"]
+    columns = ["duration", "review_median", "review_mean", "review_huber", "y"]
 
     unique_days = df_filtered["day_offset"].unique()
 
@@ -36,9 +117,11 @@ def process_user(user_id):
 
     median_groups = train_df.groupby("rating")["duration"].median()
     mean_groups = train_df.groupby("rating")["duration"].mean()
+    huber_groups = train_df.groupby("rating")["duration"].apply(huber)
 
     df_filtered["review_median"] = df_filtered["rating"].map(median_groups)
     df_filtered["review_mean"] = df_filtered["rating"].map(mean_groups)
+    df_filtered["review_huber"] = df_filtered["rating"].map(huber_groups)
 
     train_df = df_filtered[df_filtered["day_offset"].isin(train_days)]
     test_df = df_filtered[df_filtered["day_offset"].isin(test_days)]
@@ -70,6 +153,9 @@ def process_user(user_id):
 
     def rating_means():
         return {"loss": loss(test_sums["review_mean"])}
+    
+    def rating_huber():
+        return {"loss": loss(test_sums["review_huber"])}
 
     def mean_multiplier():
         multiplier = (train_sums["duration"] / train_sums["review_median"]).mean()
@@ -122,7 +208,8 @@ def process_user(user_id):
             review_trend,
             true_retention_trend,
             review_trend_siegel,
-            true_retention_trend_siegel
+            true_retention_trend_siegel,
+            rating_huber
         ]
     }
 
