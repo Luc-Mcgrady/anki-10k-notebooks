@@ -115,9 +115,15 @@ def process_user(user_id):
     train_df = df_filtered[df_filtered["day_offset"].isin(train_days)]
     test_df = df_filtered[df_filtered["day_offset"].isin(test_days)]
 
+    def safe_huber(a):
+        try:
+            return huber(a)
+        except Exception as e:
+            return 0
+
     median_groups = train_df.groupby("rating")["duration"].median()
     mean_groups = train_df.groupby("rating")["duration"].mean()
-    huber_groups = train_df.groupby("rating")["duration"].apply(huber)
+    huber_groups = train_df.groupby("rating")["duration"].apply(safe_huber)
 
     df_filtered["review_median"] = df_filtered["rating"].map(median_groups)
     df_filtered["review_mean"] = df_filtered["rating"].map(mean_groups)
