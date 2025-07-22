@@ -14,6 +14,8 @@ import math
 # Review count: User id
 # Median: 8798
 # Most: 6810
+from scipy.stats import median_abs_deviation
+import numpy as np
 
 def q_fast(array):
     n = len(array)
@@ -62,19 +64,47 @@ def q_fast(array):
 
     return const * left
 
+def robust_scale(array):
+    # Try Qn first
+    qn_result = q_fast(array)
+    if qn_result > 0:  # Not essentially zero
+        return qn_result
+
+    # Try MAD
+    mad_result = 1.4826 * median_abs_deviation(array)
+    if mad_result > 0:
+        return mad_result
+
+    # Try trimmed standard deviation (remove top 1% of values)
+    sorted_array = np.sort(array)
+    trim_point = int(0.99 * len(array))  # Keep bottom 99%
+    trimmed_array = sorted_array[:trim_point]
+    trimmed_std = np.std(trimmed_array)
+    if trimmed_std > 0:
+        return trimmed_std
+
+    # Last resort: full standard deviation
+    return np.std(array)
+
 
 def huber(a):
     array = np.asarray(a)
-    scale = q_fast(array) # estimator of scale has to be robust
+
+    if len(array) < 2:
+        return np.mean(array)
+
+    scale = robust_scale(array) # estimator of scale has to be robust
 
     if scale == 0:
         if np.max(array) == np.min(array):  # all values are the same
-            return np.mean(array)
+            return array[0]
         else:
+            print(array)
             raise Exception('Scale=0')
 
+
     prev_val = np.median(array)  # initial guess, estimator of location also has to be robust
-    maxiter = 1000
+    maxiter = 100
     tol = 1e-5
     c = 1.339  # roughly 95% asymptotic relative efficiency for a normal distribution
 
@@ -119,6 +149,7 @@ def process_user(user_id):
         try:
             return huber(a)
         except Exception as e:
+            print(e)
             return 0
 
     median_groups = train_df.groupby("rating")["duration"].median()
