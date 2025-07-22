@@ -75,9 +75,9 @@ def robust_scale(array):
     if mad_result > 0:
         return mad_result
 
-    # Try trimmed standard deviation (remove top 1% of values)
+    # Try trimmed standard deviation (remove top 10% of values)
     sorted_array = np.sort(array)
-    trim_point = int(0.99 * len(array))  # Keep bottom 99%
+    trim_point = int(0.90 * len(array))  # Keep bottom 90%
     trimmed_array = sorted_array[:trim_point]
     trimmed_std = np.std(trimmed_array)
     if trimmed_std > 0:
